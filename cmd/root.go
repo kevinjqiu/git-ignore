@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"os/user"
 	"strings"
+	"io/ioutil"
 )
 
 var language string
@@ -25,14 +26,16 @@ func pathExists(path string) bool {
 	return true
 }
 
-func cloneGitIgnoreRepo(path string) {
-	cloneCommand := exec.Command("git", "clone", REMOVE_GITIGNORE_REPO_URL, path)
-	if err := cloneCommand.Run(); err != nil {
-		log.Fatal(err)
+func cloneGitIgnoreRepoIfNecessary(path string) {
+	if !pathExists(path) {
+		cloneCommand := exec.Command("git", "clone", REMOVE_GITIGNORE_REPO_URL, path)
+		if err := cloneCommand.Run(); err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
-func getGitIgnoreFiles(path string) []string {
+func getGitIgnoreLangs(path string) []string {
 	var out bytes.Buffer
 	lsCommand := exec.Command("ls", "-1", path)
 	lsCommand.Stdout = &out
@@ -44,28 +47,60 @@ func getGitIgnoreFiles(path string) []string {
 	result := make([]string, 0)
 	for _, line := range(strings.Split(out.String(), "\n")) {
 		if strings.HasSuffix(line, ".gitignore") {
-			result = append(result, line)
+			parts := strings.Split(line, ".")
+			result = append(result, parts[0])
 		}
 	}
 	return result
+}
+
+func getGitIgnoreRepoPath() string {
+	currentUser, _ := user.Current()
+	return currentUser.HomeDir + "/.gitignore-repo"
 }
 
 var RootCmd = &cobra.Command{
 	Use:   "git-ignore",
 	Short: "Setup .gitignore file",
 	Run: func(cmd *cobra.Command, args []string) {
-		currentUser, _ := user.Current()
-		var localGitignoreRepoPath = currentUser.HomeDir + "/.gitignore-repo"
+		if listLangs == true {
+			var localGitignoreRepoPath = getGitIgnoreRepoPath()
+			cloneGitIgnoreRepoIfNecessary(localGitignoreRepoPath)
 
-		if !pathExists(localGitignoreRepoPath) {
-			cloneGitIgnoreRepo(localGitignoreRepoPath)
-		}
-
-		out := getGitIgnoreFiles(localGitignoreRepoPath)
-		for _, line := range(out) {
-			if strings.HasSuffix(line, ".gitignore") {
-				fmt.Println(line)
+			langs := getGitIgnoreLangs(localGitignoreRepoPath)
+			for _, lang := range(langs) {
+				fmt.Println(strings.ToLower(lang))
 			}
+		} else if language != "" {
+			var localGitignoreRepoPath = getGitIgnoreRepoPath()
+			cloneGitIgnoreRepoIfNecessary(localGitignoreRepoPath)
+
+			langs := getGitIgnoreLangs(localGitignoreRepoPath)
+			for _, lang := range(langs) {
+				if strings.ToLower(lang) == strings.ToLower(language) {
+					templateFilePath := fmt.Sprintf("%s/%s.gitignore", localGitignoreRepoPath, lang)
+					cwd, err := os.Getwd()
+					if err != nil {
+						os.Stderr.WriteString("Cannot get CWD")
+					}
+					gitIgnoreFilePath := cwd + "/.gitignore"
+					templateFileBody, err := ioutil.ReadFile(templateFilePath)
+					if err != nil {
+						os.Stderr.WriteString(fmt.Sprintf("Cannot read file: %s", templateFilePath))
+						return
+					}
+
+					mode := os.ModePerm
+					if shouldAppend == true {
+						mode = mode | os.ModeAppend
+					}
+					ioutil.WriteFile(gitIgnoreFilePath, templateFileBody, mode)
+					return
+				}
+			}
+			os.Stderr.WriteString(fmt.Sprintf("No template for %s", language))
+		} else {
+			os.Stderr.WriteString("No action provided.\nPlease see git ignore -h for help\n")
 		}
 	},
 }
@@ -78,7 +113,7 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVar(&language, "lang", "g", "Generate language specific .gitignore file")
+	RootCmd.Flags().StringVarP(&language, "lang", "g", "", "Generate language specific .gitignore file")
 	RootCmd.Flags().BoolVarP(&shouldAppend, "append", "a", false, "Append to the current .gitignore")
 	RootCmd.Flags().BoolVarP(&listLangs, "list", "", false, "List available language-specific .gitignore files")
 }
