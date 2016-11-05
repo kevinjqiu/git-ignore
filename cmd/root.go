@@ -78,7 +78,7 @@ func Execute() {
 }
 
 func init() {
-	RootCmd.PersistentFlags().StringVar(&language, "lang", "", "Generate language specific .gitignore file")
+	RootCmd.PersistentFlags().StringVar(&language, "lang", "g", "Generate language specific .gitignore file")
 	RootCmd.Flags().BoolVarP(&shouldAppend, "append", "a", false, "Append to the current .gitignore")
 	RootCmd.Flags().BoolVarP(&listLangs, "list", "", false, "List available language-specific .gitignore files")
 }
