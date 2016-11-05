@@ -81,20 +81,31 @@ var RootCmd = &cobra.Command{
 					templateFilePath := fmt.Sprintf("%s/%s.gitignore", localGitignoreRepoPath, lang)
 					cwd, err := os.Getwd()
 					if err != nil {
-						os.Stderr.WriteString("Cannot get CWD")
+						os.Stderr.WriteString(fmt.Sprintf("Cannot get CWD: %s", err))
 					}
+
 					gitIgnoreFilePath := cwd + "/.gitignore"
 					templateFileBody, err := ioutil.ReadFile(templateFilePath)
 					if err != nil {
-						os.Stderr.WriteString(fmt.Sprintf("Cannot read file: %s", templateFilePath))
+						os.Stderr.WriteString(fmt.Sprintf("Cannot read file %s: %s", templateFilePath, err))
 						return
 					}
 
-					mode := os.ModePerm
+					mode := os.O_WRONLY
 					if shouldAppend == true {
-						mode = mode | os.ModeAppend
+						mode = mode | os.O_APPEND
 					}
-					ioutil.WriteFile(gitIgnoreFilePath, templateFileBody, mode)
+					f, err := os.OpenFile(gitIgnoreFilePath, mode, 0644)
+					defer f.Close()
+					if err != nil {
+						os.Stderr.WriteString(fmt.Sprintf("Cannot open file %s for writing: %s", gitIgnoreFilePath, err))
+						return
+					}
+
+					if _, err := f.Write(templateFileBody); err != nil {
+						os.Stderr.WriteString(fmt.Sprintf("Error while writing %s: %s", gitIgnoreFilePath, err))
+						return
+					}
 					return
 				}
 			}
