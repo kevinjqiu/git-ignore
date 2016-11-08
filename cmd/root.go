@@ -4,18 +4,19 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/spf13/cobra"
-	"os/exec"
-	"log"
 	"bytes"
+	"github.com/spf13/cobra"
+	"io/ioutil"
+	"log"
+	"os/exec"
 	"os/user"
 	"strings"
-	"io/ioutil"
 )
 
 var language string
 var listLangs bool
 var shouldAppend bool
+
 const REMOVE_GITIGNORE_REPO_URL = "https://github.com/github/gitignore.git"
 
 func pathExists(path string) bool {
@@ -45,7 +46,7 @@ func getGitIgnoreLangs(path string) []string {
 	}
 
 	result := make([]string, 0)
-	for _, line := range(strings.Split(out.String(), "\n")) {
+	for _, line := range strings.Split(out.String(), "\n") {
 		if strings.HasSuffix(line, ".gitignore") {
 			parts := strings.Split(line, ".")
 			result = append(result, parts[0])
@@ -68,7 +69,7 @@ var RootCmd = &cobra.Command{
 			cloneGitIgnoreRepoIfNecessary(localGitignoreRepoPath)
 
 			langs := getGitIgnoreLangs(localGitignoreRepoPath)
-			for _, lang := range(langs) {
+			for _, lang := range langs {
 				fmt.Println(strings.ToLower(lang))
 			}
 		} else if language != "" {
@@ -76,7 +77,7 @@ var RootCmd = &cobra.Command{
 			cloneGitIgnoreRepoIfNecessary(localGitignoreRepoPath)
 
 			langs := getGitIgnoreLangs(localGitignoreRepoPath)
-			for _, lang := range(langs) {
+			for _, lang := range langs {
 				if strings.ToLower(lang) == strings.ToLower(language) {
 					templateFilePath := fmt.Sprintf("%s/%s.gitignore", localGitignoreRepoPath, lang)
 					cwd, err := os.Getwd()
@@ -91,7 +92,7 @@ var RootCmd = &cobra.Command{
 						return
 					}
 
-					mode := os.O_WRONLY
+					mode := os.O_WRONLY | os.O_CREATE
 					if shouldAppend == true {
 						mode = mode | os.O_APPEND
 					}
